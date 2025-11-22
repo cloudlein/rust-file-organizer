@@ -3,6 +3,7 @@
 A simple CLI tool for organizing files based on their extensions.  
 This project is designed as a real-world Rust practice exercise using an **incremental development** approach — building feature by feature instead of all at once.
 structre project can see on [this](STRUCTURE_PROJECT.md)
+
 ---
 
 ## Project Goals
@@ -18,12 +19,12 @@ structre project can see on [this](STRUCTURE_PROJECT.md)
 
 | Feature | Status |
 |--------|--------|
-| Scan folder and list files | ⏳ pending |
-| Group files by extension | ⏳ pending |
-| CLI arguments (`--path`, `--dry-run`) | ⏳ pending |
-| Organize (move files) | ⏳ pending |
-| Progress bar + logging | ⏳ pending |
-| `.toml` config support for custom rules | ⏳ pending |
+| Scan folder and list files | pending |
+| Group files by extension | pending |
+| CLI arguments (`--path`, `--dry-run`) | pending |
+| Organize (move files) | pending |
+| Progress bar + logging | pending |
+| `.toml` config support for custom rules | pending |
 
 ---
 
