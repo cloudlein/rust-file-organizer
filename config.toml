@@ -1,0 +1,5 @@
+[folders]
+images = ["jpg", "jpeg", "png", "gif"]
+documents = ["pdf", "docx", "txt"]
+archives = ["zip", "rar", "7z"]
+videos = ["mp4"]
