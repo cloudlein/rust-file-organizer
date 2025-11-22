@@ -14,3 +14,38 @@ rust-file-organizer/
 ├── Cargo.toml
 └── README.md
 ```
+
+## Test files structure 
+```json
+test_files/
+├── image.png
+├── video.mp4
+├── readme.txt
+├── doc.pdf
+└── old_backup.zip
+```
+
+to run organizer: 
+```cmd
+cargo run -- --path ./test_files --dry-run
+```
+
+## workflow v1.0
+```json
+User runs command
+        ↓
+CLI reads arguments
+        ↓
+Resolve target directory (user input OR working directory)
+        ↓
+Load config (if exists)
+        ↓
+Scan folder (recursively or not, based on config)
+        ↓
+Group detected files by extension rule
+        ↓
+If dry-run: show planned actions only
+Else: move files to destination folders
+        ↓
+Show summary + stats
+```
