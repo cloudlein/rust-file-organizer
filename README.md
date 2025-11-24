@@ -51,12 +51,12 @@ Each milestone corresponds to a version tag.
 
 ### 🔹 Milestone: `v0.1 — Directory Scanner`
 
-- [ ] Initialize project using `cargo new`
-- [ ] Implement directory reading (`std::fs`, `walkdir`)
-- [ ] Output list of detected files
-- [ ] Add basic error handling (missing folder, permissions)
-- [ ] Add minimal unit tests
-- [ ] Commit & tag release `v0.1`
+- [x] Initialize project using `cargo new`
+- [x] Implement directory reading (`std::fs`, `walkdir`)
+- [x] Output list of detected files
+- [x] Add basic error handling (missing folder, permissions)
+- [x] Add minimal unit tests
+- [x] Commit & tag release `v0.1`
 
 ---
 
