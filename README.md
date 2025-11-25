@@ -19,9 +19,9 @@ structre project can see on [this](STRUCTURE_PROJECT.md)
 
 | Feature | Status |
 |--------|--------|
-| Scan folder and list files | pending |
-| Group files by extension | pending |
-| CLI arguments (`--path`, `--dry-run`) | pending |
+| Scan folder and list files | resolved |
+| Group files by extension | resolved |
+| CLI arguments (`--path`, `--dry-run`) | WIP |
 | Organize (move files) | pending |
 | Progress bar + logging | pending |
 | `.toml` config support for custom rules | pending |
@@ -62,12 +62,12 @@ Each milestone corresponds to a version tag.
 
 ### 🔹 Milestone: `v0.2 — File Grouping`
 
-- [ ] Extract file extensions
-- [ ] Store results in `HashMap<String, Vec<Path>>`
-- [ ] Print grouped results
-- [ ] Add error handling for files without extensions
-- [ ] Refactor into modular functions
-- [ ] Commit & tag release `v0.2`
+- [x] Extract file extensions
+- [x] Store results in `HashMap<String, Vec<Path>>`
+- [x] Print grouped results
+- [x] Add error handling for files without extensions
+- [x] Refactor into modular functions
+- [x] Commit & tag release `v0.2`
 
 ---
 
