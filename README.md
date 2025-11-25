@@ -117,6 +117,3 @@ Each milestone corresponds to a version tag.
 | Filesystem traversal | `walkdir` |
 | Config parsing | `serde` + `toml` |
 | UX enhancement | `indicatif` |
-
----
-
