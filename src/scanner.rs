@@ -1,22 +1,9 @@
+use std::collections::HashMap;
+use std::hash::Hash;
+use std::path::Path;
 use walkdir::WalkDir;
 use crate::config::{load_config, Config};
-pub struct FileGroups {
-    pub archives: Vec<String>,
-    pub documents: Vec<String>,
-    pub images: Vec<String>,
-    pub videos: Vec<String>,
-}
 
-impl FileGroups {
-    pub fn new() -> Self {
-        Self {
-            archives: vec![],
-            documents: vec![],
-            images: vec![],
-            videos: vec![],
-        }
-    }
-}
 
 enum FileType {
     Archive,
@@ -26,10 +13,10 @@ enum FileType {
     Video
 }
 
-pub fn scan(path: &str) -> FileGroups{
+pub fn scan(path: &str) -> HashMap<String, Vec<String>> {
     // using test_file for testing
     let config = load_config();
-    let mut groups = FileGroups::new();
+    let mut groups = HashMap::new();
 
     for entry in WalkDir::new(path) {
         let entry = match entry {
@@ -69,7 +56,21 @@ pub fn scan(path: &str) -> FileGroups{
     groups
 }
 
-fn detect_file_type(ext: &str, config: &Config) -> FileType {
+fn extract_extension(path: &Path) -> Option<String> {
+    path.extension()
+    .and_then(|e| e.to_str())
+    .map(|e| e.to_string())
+}
+fn read_files(path: &str) -> Vec<String>{
+    WalkDir::new(path)
+    .into_iter()
+    .filter_map(|e| e.ok())
+    .filter(|e| e.file_type().is_file())
+    .map(|e| e.path().to_string_lossy().to_string())
+    .collect()
+}
+
+fn detect_file_type(ext: &str, config: &Config) -> Option<FileType> {
     let ext = ext.to_lowercase();
 
     if config.folders.archives.contains(&ext) {
