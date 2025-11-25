@@ -1,53 +1,25 @@
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::path::Path;
-use walkdir::WalkDir;
 use crate::config::{load_config, Config};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
-
-enum FileType {
-    Archive,
-    Image,
-    Document,
-    Unsupported,
-    Video
-}
 
 pub fn scan(path: &str) -> HashMap<String, Vec<String>> {
     // using test_file for testing
     let config = load_config();
     let mut groups = HashMap::new();
 
-    for entry in WalkDir::new(path) {
-        let entry = match entry {
-            Ok(e) => e,
-            Err(e) => {
-                eprintln!("Failed to read entry: {}", e);
-                continue;
-            }
-        };
-
-        let path = entry.path();
-
-        if !path.is_file() {
-            continue;
-        }
-
-        let ext = match path.extension().and_then(|e| e.to_str()) {
-            Some(e) => e.to_lowercase(),
+    for file in read_file(path) {
+        match extract_extension(&file) {
+           Some(ext) => {
+               if let Some(category) = classify(&ext, &config) {
+                   group_file(&mut groups, &category, &file);
+               }else {
+                   eprintln!("Unknown extension: {}", ext);
+               }
+           }
             None => {
-                eprintln!("No extension: {:?}", path);
-                continue;
-            }
-        };
-
-        match detect_file_type(&ext, &config) {
-            FileType::Archive => groups.archives.push(path.to_string_lossy().to_string()),
-            FileType::Image => groups.images.push(path.to_string_lossy().to_string()),
-            FileType::Document => groups.documents.push(path.to_string_lossy().to_string()),
-            FileType::Video => groups.videos.push(path.to_string_lossy().to_string()),
-            FileType::Unsupported => {
-                eprintln!("⚠️ Unsupported file type: {}", ext);
+                eprintln!("Unknown file type: {:?}", file);
             }
         }
     }
@@ -56,65 +28,54 @@ pub fn scan(path: &str) -> HashMap<String, Vec<String>> {
     groups
 }
 
+fn read_file(path: &str) -> Vec<PathBuf> {
+    WalkDir::new(path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .map(|e| e.path().to_path_buf())
+        .collect()
+}
+
 fn extract_extension(path: &Path) -> Option<String> {
     path.extension()
-    .and_then(|e| e.to_str())
-    .map(|e| e.to_string())
-}
-fn read_files(path: &str) -> Vec<String>{
-    WalkDir::new(path)
-    .into_iter()
-    .filter_map(|e| e.ok())
-    .filter(|e| e.file_type().is_file())
-    .map(|e| e.path().to_string_lossy().to_string())
-    .collect()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_lowercase())
 }
 
-fn detect_file_type(ext: &str, config: &Config) -> Option<FileType> {
-    let ext = ext.to_lowercase();
-
-    if config.folders.archives.contains(&ext) {
-        FileType::Archive
-    } else if config.folders.images.contains(&ext) {
-        FileType::Image
-    } else if config.folders.documents.contains(&ext) {
-        FileType::Document
-    } else if config.folders.videos.contains(&ext) {
-        FileType::Video
-    } else {
-        FileType::Unsupported
+fn classify(ext: &str, config: &Config) -> Option<String> {
+    if config.folders.archives.contains(&ext.to_string()) {
+        Some("archive".to_string())
+    }else if config.folders.documents.contains(&ext.to_string()) {
+        Some("document".to_string())
+    }else if config.folders.images.contains(&ext.to_string()) {
+        Some("image".to_string())
+    }else if config.folders.videos.contains(&ext.to_string()) {
+        Some("video".to_string())
+    }else {
+        None
     }
 }
 
-fn print_groups(groups: &FileGroups) {
+fn group_file(groups: &mut HashMap<String, Vec<String>>, category: &str, path: &Path) {
+    groups.entry(category.to_string())
+        .or_default()
+        .push(path.to_string_lossy().to_string());
+}
+
+fn print_groups(groups: &HashMap<String, Vec<String>>) {
     println!("== File Groups ==");
-
-    println!("Archives:");
-    for item in &groups.archives {
-        println!("  - {}", item);
+    for (key, value) in groups {
+        println!("{}: {:?}", key, value);
     }
 
-    println!("Documents:");
-    for item in &groups.documents {
-        println!("  - {}", item);
-    }
-
-    println!("Images:");
-    for item in &groups.images {
-        println!("  - {}", item);
-    }
-
-    println!("Videos:");
-    for item in &groups.videos {
-        println!("  - {}", item);
-    }
 }
 
 
 #[cfg(test)]
 mod tests {
-    use std::fs::File;
     use super::*;
+    use std::fs::File;
     use tempfile::Builder;
 
     #[test]
@@ -139,11 +100,10 @@ mod tests {
 
         let result = scan(dir.path().to_str().unwrap());
 
-        assert_eq!(result.archives.len(), 3);
-        assert_eq!(result.documents.len(), 3);
-        assert_eq!(result.images.len(), 4);
-        assert_eq!(result.videos.len(), 1);
-
+        assert_eq!(result.get("archive").map_or(0, |v| v.len()), 3);
+        assert_eq!(result.get("document").map_or(0, |v| v.len()), 3);
+        assert_eq!(result.get("image").map_or(0, |v| v.len()), 4);
+        assert_eq!(result.get("video").map_or(0, |v| v.len()), 1);
     }
 
 }
