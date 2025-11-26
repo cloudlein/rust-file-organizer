@@ -1,6 +1,7 @@
 use crate::config::{load_config, Config};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use colored::Colorize;
 use walkdir::WalkDir;
 
 
@@ -64,9 +65,9 @@ fn group_file(groups: &mut HashMap<String, Vec<String>>, category: &str, path: &
 }
 
 fn print_groups(groups: &HashMap<String, Vec<String>>) {
-    println!("== File Groups ==");
+    println!("{}", "== File Groups ==".purple());
     for (key, value) in groups {
-        println!("{}: {:?}", key, value);
+        println!("{}: {:?}", key.blue().bold(), value);
     }
 
 }
