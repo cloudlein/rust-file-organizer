@@ -21,8 +21,8 @@ structre project can see on [this](STRUCTURE_PROJECT.md)
 |--------|--------|
 | Scan folder and list files | resolved |
 | Group files by extension | resolved |
-| CLI arguments (`--path`, `--dry-run`) | WIP |
-| Organize (move files) | pending |
+| CLI arguments (`--path`, `--dry-run`) | resolved |
+| Organize (move files) | WIP |
 | Progress bar + logging | pending |
 | `.toml` config support for custom rules | pending |
 
@@ -73,12 +73,12 @@ Each milestone corresponds to a version tag.
 
 ### 🔹 Milestone: `v0.3 — CLI Support`
 
-- [ ] Add `clap` dependency
-- [ ] Add CLI options:
+- [x] Add `clap` dependency
+- [x] Add CLI options:
     - `--path <directory>`
     - `--dry-run`
-- [ ] Validate input arguments
-- [ ] Commit & tag release `v0.3`
+- [x] Validate input arguments
+- [x] Commit & tag release `v0.3`
 
 ---
 
