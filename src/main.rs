@@ -1,7 +1,9 @@
 use std::path::Path;
 use crate::cli::{parse_args, Commands};
-use crate::scanner::scan;
+use crate::scanner::{print_groups, scan};
 use colored::Colorize;
+use crate::cli::Commands::Scan;
+use crate::mover::move_files;
 
 mod scanner;
 mod grouping;
@@ -20,12 +22,15 @@ fn main() {
            check_if_file_exists(&path);
 
             println!("{} {}", "Scanning: ".cyan(), path);
-            scan(&path);
-
+            let mut scan_result = scan(&path);
+            print_groups(&mut scan_result);
         }
         Commands::Organize {path, dry_run} => {
 
             check_if_file_exists(&path);
+            let scanner = scan(&path);
+
+            move_files("test_file", &scanner);
 
             println!("{} {}", "Organize target:".cyan(), path);
             println!("{} {}", "Dry-run:".red(), dry_run);

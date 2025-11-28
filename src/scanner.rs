@@ -24,8 +24,7 @@ pub fn scan(path: &str) -> HashMap<String, Vec<String>> {
             }
         }
     }
-
-    print_groups(&mut groups);
+    
     groups
 }
 
@@ -64,7 +63,7 @@ fn group_file(groups: &mut HashMap<String, Vec<String>>, category: &str, path: &
         .push(path.to_string_lossy().to_string());
 }
 
-fn print_groups(groups: &HashMap<String, Vec<String>>) {
+pub fn print_groups(groups: &HashMap<String, Vec<String>>) {
     println!("{}", "== File Groups ==".purple());
     for (key, value) in groups {
         println!("{}: {:?}", key.blue().bold(), value);
