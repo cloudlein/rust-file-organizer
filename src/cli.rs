@@ -1,7 +1,4 @@
-use std::env;
-use crate::scanner::scan;
-use clap::{Command, Parser, Subcommand};
-use crate::cli::Commands::Scan;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(name = "file-organizer")]
@@ -24,6 +21,9 @@ pub enum Commands {
         #[arg(short, long)]
         path: String,
 
+        #[arg(short, long)]
+        destination: String,
+        
         #[arg(short, long, default_value_t = false)]
         dry_run: bool,
     }
@@ -75,7 +75,7 @@ mod tests {
 
 
         match args.command {
-            Commands::Organize { path , dry_run } => {
+            Commands::Organize { path,destination , dry_run } => {
                 assert_eq!(path, "./test_files");
                 assert_eq!(dry_run, true);
             }
@@ -115,7 +115,7 @@ mod tests {
         ]).unwrap();
 
         match args.command {
-            Commands::Organize { path, dry_run } => {
+            Commands::Organize { path, destination, dry_run } => {
                 assert_eq!(path, "./test_files");
                 assert!(!dry_run);
             }
