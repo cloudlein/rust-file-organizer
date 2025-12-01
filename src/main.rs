@@ -31,15 +31,6 @@ fn main() {
             let scanner = scan(&path);
 
            move_files(&path, &destination, &scanner, dry_run);
-
-            // println!("{} {}", "Organize target:".cyan(), path);
-            // println!("{} {}", "Dry-run:".red(), dry_run);
-
-            if dry_run {
-                println!("{}", "Dry-run mode: no files will be moved.".red().bold());
-            } else {
-                // TODO: milestone v0.4
-            }
         }
     }
 

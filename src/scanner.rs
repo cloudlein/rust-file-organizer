@@ -58,9 +58,16 @@ fn classify(ext: &str, config: &Config) -> Option<String> {
 }
 
 fn group_file(groups: &mut HashMap<String, Vec<String>>, category: &str, path: &Path) {
+
+    let file_name = path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+
     groups.entry(category.to_string())
         .or_default()
-        .push(path.to_string_lossy().to_string());
+        .push(file_name);
 }
 
 pub fn print_groups(groups: &HashMap<String, Vec<String>>) {
