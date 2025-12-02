@@ -115,7 +115,6 @@ fn create_folder_and_move_files(dir: &str, file_paths: &[String], src_path: &str
             })?;
     }
 
-
     for file in file_paths {
         let src = Path::new(src_path).join(file);
 
