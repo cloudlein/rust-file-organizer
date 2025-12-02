@@ -9,7 +9,7 @@ use tabled::{
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-enum FileError {
+pub enum FileError {
     #[error("Failed to create folder '{path}': {source}")]
     FolderCreation {
         path: PathBuf,
@@ -47,41 +47,40 @@ struct FileMove {
     after: String,
 }
 
-pub fn move_files(
+pub fn move_files (
     root_path: &str,
     destination: &str,
     files: &HashMap<String, Vec<String>>,
     dry_run: bool
-) {
-   match dry_run {
-       true => {
-           preview_file_moves(files, root_path, destination, dry_run);
-       }
-       false => {
-           preview_file_moves(files, root_path, destination, dry_run);
-           if let Some(items) = files.get("archive") {
-               create_folder_and_move_files(&format!("{}/archive", destination), items, root_path);
-           }
-           if let Some(items) = files.get("document") {
-               create_folder_and_move_files(&format!("{}/document", destination), items, root_path);
-           }
-           if let Some(items) = files.get("image") {
-               create_folder_and_move_files(&format!("{}/image", destination), items, root_path);
-           }
-           if let Some(items) = files.get("video") {
-               create_folder_and_move_files(&format!("{}/video", destination), items, root_path);
-           }
-       }
-   }
+) -> Result<(), FileError> {
+    preview_file_moves(files, root_path, destination, dry_run);
+    if dry_run {
+        return Ok(());
+    }
+
+    preview_file_moves(files, root_path, destination, dry_run);
+
+    for (category, items) in files {
+        let folder = format!("{}/{}", destination, category);
+        create_folder_and_move_files(&folder, items, root_path)
+            .expect("Cant create folder and move items");
+    }
+
+    Ok(())
 }
 
-fn preview_file_moves(files: &HashMap<String, Vec<String>>, path_scan: &str, destination: &str, dry_run: bool) {
+fn preview_file_moves(
+    files: &HashMap<String, Vec<String>>,
+    path_scan: &str,
+    destination: &str,
+    dry_run: bool
+) {
     let mut file_moves = Vec::new();
-    for (key, value) in files {
-        for item in value {
+    for (category, items) in files {
+        for item in items {
             file_moves.push(FileMove{
                 before: format!("{}/{}", path_scan, item),
-                after: format!("{}/{}", destination, item),
+                after: format!("{}/{}/{}", destination, category, item),
             })
         }
     }
@@ -91,7 +90,7 @@ fn preview_file_moves(files: &HashMap<String, Vec<String>>, path_scan: &str, des
 
     println!("Scanning folder : {}", path_scan);
     println!("Destination folder : {}", destination);
-    println!("Dry run: {}", dry_run);
+    println!("Dry run: {}", dry_run.to_string().green().bold());
     println!("Preview file moves:");
     if dry_run {
         println!("{}", "Dry-run mode: no files will be moved.".red().bold());
@@ -99,60 +98,124 @@ fn preview_file_moves(files: &HashMap<String, Vec<String>>, path_scan: &str, des
     println!("{}", table);
 }
 
-fn create_folder_and_move_files(dir: &str, file_paths: &[String], src_path: &str ) -> Result<(), FileError> {
+fn create_folder_and_move_files(
+    dir: &str,
+    file_paths: &[String],
+    src_path: &str,
+) -> Result<(), FileError> {
+
     let destination = Path::new(dir);
 
     if !destination.exists() {
-        fs::create_dir_all(destination)
-            .map_err(|e| match e.kind() {
-                io::ErrorKind::PermissionDenied => FileError::PermissionDenied {
-                    path: destination.to_path_buf(),
-                },
-                _ => FileError::FolderCreation {
-                    path: destination.to_path_buf(),
-                    source: e,
-                },
-            })?;
+        fs::create_dir_all(destination).map_err(|e| match e.kind() {
+            io::ErrorKind::PermissionDenied => FileError::PermissionDenied {
+                path: destination.to_path_buf(),
+            },
+            _ => FileError::FolderCreation {
+                path: destination.to_path_buf(),
+                source: e,
+            },
+        })?;
     }
 
     for file in file_paths {
         let src = Path::new(src_path).join(file);
 
         if !src.exists() {
-            eprintln!("{}", FileError::NotFound { path: src.to_path_buf() });
+            eprintln!("{}", FileError::NotFound {
+                path: src.to_path_buf(),
+            });
             continue;
         }
 
-        let file_name = match src.file_name() {
-            Some(f) => f,
-            None => {
-                eprintln!("{} : invalid filename", file.red());
-                continue;
-            }
-        };
-
+        let file_name = src.file_name().unwrap();
         let new_path = destination.join(file_name);
 
         if new_path.exists() {
-            eprintln!("{}" , FileError::DestinationExists { path: new_path.clone()});
-        }
-
-        if let Err(e) = fs::rename(&src, &new_path) {
-            match e.kind() {
-                io::ErrorKind::PermissionDenied => {
-                    eprintln!("{}", FileError::PermissionDenied { path: src.to_path_buf() });
-                }
-                _ => {
-                    eprintln!("{}", FileError::FileMove {
-                        path: src.to_path_buf(),
-                        source: e,
-                    });
-                }
-            }
+            eprintln!("{}", FileError::DestinationExists {
+                path: new_path.clone(),
+            });
             continue;
         }
+
+        fs::rename(&src, &new_path).map_err(|e| match e.kind() {
+            io::ErrorKind::PermissionDenied => FileError::PermissionDenied {
+                path: src.to_path_buf(),
+            },
+            _ => FileError::FileMove {
+                path: src.to_path_buf(),
+                source: e,
+            },
+        })?;
     }
 
     Ok(())
+}
+
+/*
+===========================================
+ Test Plan – Organize Command
+===========================================
+
+A. Dry-run Mode
+----------------
+- Preview only, no files moved.
+- Given: 2 file categories, dry_run = true
+- Assert:
+  * Destination folders are NOT created.
+  * No files are moved.
+
+B. Move Mode — Normal Behavior
+-------------------------------
+- Move all files according to their categories.
+- Given: valid source files.
+- Assert:
+  * Category folders are created.
+  * Files are successfully moved.
+
+- Case: Destination folder already exists
+  * The folder exists before the operation.
+  * Assert: No error should occur and processing continues.
+
+C. Error Scenarios
+-------------------
+1. File not found
+   * Assert: function still returns Ok(()).
+   * Error message printed to stdout.
+
+2. No permission to create folder
+   * Use a read-only parent directory (OS dependent).
+   * Expect: Err(FileError::PermissionDenied).
+
+3. Rename/move fails due to permission
+   * File is read-only.
+   * Expect: Err(FileError::PermissionDenied).
+
+D. Dynamic Category Behavior
+-----------------------------
+- Categories may change dynamically (e.g., "audio", "gif", etc).
+- HashMap contains dynamic keys.
+- Assert:
+  * Function moves files based on the dynamic keys.
+  * No hardcoded category assumptions.
+
+E. Integration Behavior
+------------------------
+- Preview MUST always appear before the move operation.
+- Use stdout capture.
+- Expected output order:
+  1) preview
+  2) move operations
+*/
+
+#[cfg(test)]
+mod tests {
+
+
+    #[test]
+    fn test_preview_file_moves() {
+
+    }
+
 }
 

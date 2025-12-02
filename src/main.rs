@@ -1,9 +1,8 @@
-use std::path::Path;
 use crate::cli::{parse_args, Commands};
+use crate::mover::move_files;
 use crate::scanner::{print_groups, scan};
 use colored::Colorize;
-use crate::cli::Commands::Scan;
-use crate::mover::move_files;
+use std::path::Path;
 
 mod scanner;
 mod grouping;

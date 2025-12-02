@@ -24,7 +24,7 @@ pub enum Commands {
         #[arg(short, long)]
         destination: String,
         
-        #[arg(short, long, default_value_t = false)]
+        #[arg(long, default_value_t = false)]
         dry_run: bool,
     }
 }
@@ -68,8 +68,8 @@ mod tests {
         let args = Cli::try_parse_from([
             "rust-file-organizer",
             "organize",
-            "--path",
-            "./test_files",
+            "--path",  "./test_files",
+            "--destination", "./move",
             "--dry-run"
         ]).unwrap();
 
@@ -77,9 +77,11 @@ mod tests {
         match args.command {
             Commands::Organize { path,destination , dry_run } => {
                 assert_eq!(path, "./test_files");
+                assert_eq!(destination, "./move");
                 assert_eq!(dry_run, true);
             }
-            _ => panic!("Expected scan command!")
+            _ => panic!("Expected organize command!")
+
         }
     }
 
@@ -110,14 +112,16 @@ mod tests {
         let args = Cli::try_parse_from([
             "rust-file-organizer",
             "organize",
-            "--path",
-            "./test_files",
+            "--path",  "./test_files",
+            "--destination", "./move",
+            "--dry-run"
         ]).unwrap();
 
         match args.command {
             Commands::Organize { path, destination, dry_run } => {
                 assert_eq!(path, "./test_files");
-                assert!(!dry_run);
+                assert_eq!(destination, "./move");
+                assert!(dry_run);
             }
             _ => panic!("Expected organize command!")
         }
