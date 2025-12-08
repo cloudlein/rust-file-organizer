@@ -210,12 +210,79 @@ E. Integration Behavior
 
 #[cfg(test)]
 mod tests {
-
+    use std::collections::HashMap;
+    use std::fs::File;
+    use tempfile::{Builder, TempDir};
+    use crate::mover::{preview_file_moves};
 
     #[test]
-    fn test_preview_file_moves() {
+    fn test_dry_run_mode() {
+        let scan_dir = create_temp_dir("test_scan");
+
+        let dest_dir = create_temp_dir("destination");
+
+        let destination_path = dest_dir.path().to_str().unwrap();
+
+        let exts = ["jpg", "mp4"];
+
+        for ext in exts {
+            let file_path = scan_dir.path().join(format!("file.{}", ext));
+            File::create(file_path).unwrap();
+        }
+
+        let mut files = HashMap::new();
+        files.insert(
+            "images".to_string(),
+            vec!["file.jpg".to_string()],
+        );
+        files.insert(
+            "videos".to_string(),
+            vec!["file.mp4".to_string()],
+        );
+
+        let result =  preview_file_moves(&files, scan_dir.path().to_str().unwrap(), destination_path, true);
+
+        // Assert: destination folder should NOT contain category folders
+        assert!(!dest_dir.path().join("images").exists());
+        assert!(!dest_dir.path().join("videos").exists());
+    }
+
+    #[test]
+    fn test_move_file() {
+        let scan_dir = create_temp_dir("test_scan");
+
+        let dest_dir = create_temp_dir("destination");
+
+        let destination_path = dest_dir.path().to_str().unwrap();
+
+        let exts = ["jpg", "mp4"];
+
+        for ext in exts {
+            let file_path = scan_dir.path().join(format!("file.{}", ext));
+            File::create(file_path).unwrap();
+        }
+
+        let mut files = HashMap::new();
+        files.insert(
+            "images".to_string(),
+            vec!["file.jpg".to_string()],
+        );
+        files.insert(
+            "videos".to_string(),
+            vec!["file.mp4".to_string()],
+        );
+
+        let result =  preview_file_moves(&files, scan_dir.path().to_str().unwrap(), destination_path, false);
+
 
     }
 
+
+    fn create_temp_dir(dir_name : &str) -> TempDir {
+        Builder::new()
+            .prefix(dir_name)
+            .tempdir()
+            .expect("Failed to create temp dir")
+    }
 }
 
