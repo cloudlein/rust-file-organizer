@@ -212,55 +212,66 @@ E. Integration Behavior
 mod tests {
     use std::collections::HashMap;
     use std::fs::File;
+    use std::path::Path;
     use tempfile::{Builder, TempDir};
-    use crate::mover::{preview_file_moves};
+    use crate::mover::{move_files, preview_file_moves, FileError};
+
+    type MediaExtensions = HashMap<&'static str, Vec<&'static str>>;
 
     #[test]
     fn test_dry_run_mode() {
         let scan_dir = create_temp_dir("test_scan");
-
         let dest_dir = create_temp_dir("destination");
-
         let destination_path = dest_dir.path().to_str().unwrap();
 
-        let exts = ["jpg", "mp4"];
+        let files = create_temp_file_per_category(
+            [
+              ("images".to_string(), vec!["jpg".to_string(), "png".to_string()]),
+              ("videos".to_string(), vec!["mp4".to_string()]),
+              ("audio".to_string(), vec!["mp3".to_string(), "wav".to_string()]),
+            ]
+            .into_iter()
+            .collect(),
+            &scan_dir);
 
-        for ext in exts {
-            let file_path = scan_dir.path().join(format!("file.{}", ext));
-            File::create(file_path).unwrap();
-        }
+        let result = preview_file_moves(&files, scan_dir.path().to_str().unwrap(), destination_path, true);
 
-        let mut files = HashMap::new();
-        files.insert(
-            "images".to_string(),
-            vec!["file.jpg".to_string()],
-        );
-        files.insert(
-            "videos".to_string(),
-            vec!["file.mp4".to_string()],
-        );
-
-        let result =  preview_file_moves(&files, scan_dir.path().to_str().unwrap(), destination_path, true);
-
-        // Assert: destination folder should NOT contain category folders
         assert!(!dest_dir.path().join("images").exists());
         assert!(!dest_dir.path().join("videos").exists());
     }
 
     #[test]
-    fn test_move_file() {
+    fn test_move_file_mode() {
         let scan_dir = create_temp_dir("test_scan");
 
         let dest_dir = create_temp_dir("destination");
 
         let destination_path = dest_dir.path().to_str().unwrap();
 
-        let exts = ["jpg", "mp4"];
+        let files = create_temp_file_per_category(
+            [
+                ("images".to_string(), vec!["jpg".to_string(), "png".to_string()]),
+                ("videos".to_string(), vec!["mp4".to_string()]),
+                ("audio".to_string(), vec!["mp3".to_string(), "wav".to_string()]),
+            ]
+                .into_iter()
+                .collect(),
+            &scan_dir);
 
-        for ext in exts {
-            let file_path = scan_dir.path().join(format!("file.{}", ext));
-            File::create(file_path).unwrap();
-        }
+        let result =  move_files(scan_dir.path().to_str().unwrap(), destination_path, &files, false);
+
+        assert!(dest_dir.path().join("images").exists());
+        assert!(dest_dir.path().join("videos").exists());
+        assert!(dest_dir.path().join("images/file.jpg").exists());
+        assert!(dest_dir.path().join("videos/file.mp4").exists());
+
+    }
+
+    #[test]
+    fn test_move_mode_missing_file_returns_ok_and_logs_error() {
+        let scan_dir = create_temp_dir("test_scan");
+        let dest_dir = create_temp_dir("destination");
+        let destination_path = dest_dir.path().to_str().unwrap();
 
         let mut files = HashMap::new();
         files.insert(
@@ -272,10 +283,20 @@ mod tests {
             vec!["file.mp4".to_string()],
         );
 
-        let result =  preview_file_moves(&files, scan_dir.path().to_str().unwrap(), destination_path, false);
-
-
+        let result =  move_files(scan_dir.path().to_str().unwrap(), destination_path, &files, false);
+        let path = dest_dir.path().join("images/file.jpg");
+        println!("{:?}", result.unwrap_err());
+        // assert_eq!(result.is_ok(), true);
     }
+    // test_move_mode_permission_denied_on_create_folder()
+    // test_move_mode_permission_denied_on_move_file()
+    // test_move_mode_moves_files_based_on_dynamic_category_map()
+    // test_integration_preview_then_move_output_order()
+    // test_move_mode_moves_files_based_on_dynamic_category_map()
+    // test_preview_is_printed_before_move_operations()
+    // test_integration_preview_then_move_output_order()
+
+
 
 
     fn create_temp_dir(dir_name : &str) -> TempDir {
@@ -284,5 +305,30 @@ mod tests {
             .tempdir()
             .expect("Failed to create temp dir")
     }
+
+    fn create_temp_file_per_category(
+        mapping: HashMap<String, Vec<String>>,
+        temp_file_path: &TempDir,
+    ) -> HashMap<String, Vec<String>> {
+
+        let mut files = HashMap::new();
+
+        for (category, exts) in mapping {
+            for ext in &exts {
+                let file_path = temp_file_path.path().join(format!("file.{}", ext));
+                File::create(file_path).unwrap();
+            }
+
+            let list = exts
+                .iter()
+                .map(|ext| format!("file.{}", ext))
+                .collect::<Vec<_>>();
+
+            files.insert(category, list);
+        }
+
+        files
+    }
+
 }
 
