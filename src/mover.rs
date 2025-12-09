@@ -1,7 +1,7 @@
 use colored::Colorize;
 use std::collections::HashMap;
-use std::{fs, io};
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 use tabled::{
     settings::Style, Table,
     Tabled,
@@ -210,11 +210,12 @@ E. Integration Behavior
 
 #[cfg(test)]
 mod tests {
+    use crate::mover::{move_files, preview_file_moves};
+    use gag::BufferRedirect;
     use std::collections::HashMap;
     use std::fs::File;
-    use std::path::Path;
+    use std::io::{Read, Write};
     use tempfile::{Builder, TempDir};
-    use crate::mover::{move_files, preview_file_moves, FileError};
 
     type MediaExtensions = HashMap<&'static str, Vec<&'static str>>;
 
@@ -273,21 +274,36 @@ mod tests {
         let dest_dir = create_temp_dir("destination");
         let destination_path = dest_dir.path().to_str().unwrap();
 
+        // Capture stderr
+        let mut stderr_buf = gag::BufferRedirect::stderr().unwrap();
+
         let mut files = HashMap::new();
-        files.insert(
-            "images".to_string(),
-            vec!["file.jpg".to_string()],
-        );
-        files.insert(
-            "videos".to_string(),
-            vec!["file.mp4".to_string()],
+        files.insert("images".to_string(), vec!["file.jpg".to_string()]);
+        files.insert("videos".to_string(), vec!["file.mp4".to_string()]);
+
+        let result = move_files(
+            scan_dir.path().to_str().unwrap(),
+            destination_path,
+            &files,
+            false,
         );
 
-        let result =  move_files(scan_dir.path().to_str().unwrap(), destination_path, &files, false);
-        let path = dest_dir.path().join("images/file.jpg");
-        println!("{:?}", result.unwrap_err());
-        // assert_eq!(result.is_ok(), true);
+        // flush agar semua output masuk buffer
+        std::io::stderr().flush().unwrap();
+
+        let mut captured_output = String::new();
+        stderr_buf.read_to_string(&mut captured_output).unwrap();
+
+        // sekarang assert akan valid
+        assert!(captured_output.contains("file.jpg") && captured_output.contains("not found"));
+        assert!(captured_output.contains("file.mp4") && captured_output.contains("not found"));
+
+        assert!(!dest_dir.path().join("images/file.jpg").exists());
+        assert!(!dest_dir.path().join("videos/file.mp4").exists());
+
+        assert!(result.is_ok());
     }
+
     // test_move_mode_permission_denied_on_create_folder()
     // test_move_mode_permission_denied_on_move_file()
     // test_move_mode_moves_files_based_on_dynamic_category_map()
