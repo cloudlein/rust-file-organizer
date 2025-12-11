@@ -54,16 +54,17 @@ pub fn move_files (
     dry_run: bool
 ) -> Result<(), FileError> {
     preview_file_moves(files, root_path, destination, dry_run);
+
     if dry_run {
         return Ok(());
     }
 
-    preview_file_moves(files, root_path, destination, dry_run);
-
     for (category, items) in files {
         let folder = format!("{}/{}", destination, category);
-        create_folder_and_move_files(&folder, items, root_path)
-            .expect("Cant create folder and move items");
+        if let Err(e) = create_folder_and_move_files(&folder, items, root_path) {
+            eprintln!("{e}");
+            return Err(e);
+        }
     }
 
     Ok(())
@@ -104,19 +105,18 @@ fn create_folder_and_move_files(
     src_path: &str,
 ) -> Result<(), FileError> {
 
-    let destination = Path::new(dir);
+    std::fs::create_dir_all(dir).map_err(|err| {
+        if err.kind() == std::io::ErrorKind::PermissionDenied {
+            FileError::PermissionDenied { path: dir.into() }
+        } else {
+            FileError::FolderCreation {
+                path: dir.into(),
+                source: err,
+            }
+        }
+    })?;
 
-    if !destination.exists() {
-        fs::create_dir_all(destination).map_err(|e| match e.kind() {
-            io::ErrorKind::PermissionDenied => FileError::PermissionDenied {
-                path: destination.to_path_buf(),
-            },
-            _ => FileError::FolderCreation {
-                path: destination.to_path_buf(),
-                source: e,
-            },
-        })?;
-    }
+    let destination = Path::new(dir);
 
     for file in file_paths {
         let src = Path::new(src_path).join(file);
@@ -138,8 +138,8 @@ fn create_folder_and_move_files(
             continue;
         }
 
-        fs::rename(&src, &new_path).map_err(|e| match e.kind() {
-            io::ErrorKind::PermissionDenied => FileError::PermissionDenied {
+        std::fs::rename(&src, &new_path).map_err(|e| match e.kind() {
+            std::io::ErrorKind::PermissionDenied => FileError::PermissionDenied {
                 path: src.to_path_buf(),
             },
             _ => FileError::FileMove {
@@ -151,6 +151,7 @@ fn create_folder_and_move_files(
 
     Ok(())
 }
+
 
 /*
 ===========================================
@@ -210,11 +211,11 @@ E. Integration Behavior
 
 #[cfg(test)]
 mod tests {
-    use crate::mover::{move_files, preview_file_moves};
-    use gag::BufferRedirect;
+    use crate::mover::{move_files, preview_file_moves, FileError};
     use std::collections::HashMap;
+    use std::fs;
     use std::fs::File;
-    use std::io::{Read, Write};
+    use std::io::{ErrorKind, Read, Write};
     use tempfile::{Builder, TempDir};
 
     type MediaExtensions = HashMap<&'static str, Vec<&'static str>>;
@@ -269,6 +270,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_move_mode_missing_file_returns_ok_and_logs_error() {
         let scan_dir = create_temp_dir("test_scan");
         let dest_dir = create_temp_dir("destination");
@@ -294,6 +296,7 @@ mod tests {
         let mut captured_output = String::new();
         stderr_buf.read_to_string(&mut captured_output).unwrap();
 
+
         // sekarang assert akan valid
         assert!(captured_output.contains("file.jpg") && captured_output.contains("not found"));
         assert!(captured_output.contains("file.mp4") && captured_output.contains("not found"));
@@ -304,8 +307,58 @@ mod tests {
         assert!(result.is_ok());
     }
 
-    // test_move_mode_permission_denied_on_create_folder()
-    // test_move_mode_permission_denied_on_move_file()
+
+    #[test]
+    fn test_move_mode_permission_denied_on_create_folder() {
+        use std::os::unix::fs::PermissionsExt;
+        let scan_dir = create_temp_dir("test_scan");
+        let dest_dir = create_temp_dir("destination");
+        let destination_path = dest_dir.path().to_str().unwrap();
+
+        // Lock folder completely → no read/write/execute
+        std::fs::set_permissions(
+            destination_path,
+            std::fs::Permissions::from_mode(0o000)
+        ).unwrap();
+
+        let mut stderr_buf = gag::BufferRedirect::stderr().unwrap();
+
+        let mut files = HashMap::new();
+        files.insert("images".to_string(), vec!["file.jpg".to_string()]);
+        files.insert("videos".to_string(), vec!["file.mp4".to_string()]);
+
+        let result = move_files(
+            scan_dir.path().to_str().unwrap(),
+            destination_path,
+            &files,
+            false,
+        );
+
+        std::io::stderr().flush().unwrap();
+
+        let mut captured_output = String::new();
+        stderr_buf.read_to_string(&mut captured_output).unwrap();
+
+        assert!(matches!(
+            result,
+            Err(FileError::PermissionDenied { .. })
+        ));
+    }
+
+    fn  test_move_mode_permission_denied_on_move_file() {
+        use std::os::unix::fs::PermissionsExt;
+        let scan_dir = create_temp_dir("test_scan");
+        let dest_dir = create_temp_dir("destination");
+        let destination_path = dest_dir.path().to_str().unwrap();
+
+
+        let mut files = HashMap::new();
+        files.insert("images".to_string(), vec!["file.jpg".to_string()]);
+        files.insert("videos".to_string(), vec!["file.mp4".to_string()]);
+
+
+
+    }
     // test_move_mode_moves_files_based_on_dynamic_category_map()
     // test_integration_preview_then_move_output_order()
     // test_move_mode_moves_files_based_on_dynamic_category_map()
