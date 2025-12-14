@@ -345,6 +345,7 @@ mod tests {
         ));
     }
 
+    #[test]
     fn  test_move_mode_permission_denied_on_move_file() {
         use std::os::unix::fs::PermissionsExt;
         let scan_dir = create_temp_dir("test_scan");
@@ -356,6 +357,30 @@ mod tests {
         files.insert("images".to_string(), vec!["file.jpg".to_string()]);
         files.insert("videos".to_string(), vec!["file.mp4".to_string()]);
 
+        for(folder, list_file) in &files {
+            let folder_path =  scan_dir.path().join(folder);
+            fs::create_dir_all(folder_path).unwrap()
+
+            for file in list_file {
+                let file_path =  scan_dir.path().join(file);
+                File::create(&file_path).unwrap();
+
+                let mut perm = file_path.metadata().unwrap().permissions();
+                perm.set_mode(0o444);
+                fs::set_permissions(&file_path, perm).unwrap();
+            }
+        }
+
+        let result = move_files(
+            scan_dir.path().to_str().unwrap(),
+            destination_path,
+            &files,
+            false,
+        );
+
+
+        println!("masuk sini");
+        println!("{:?}", result);
 
 
     }
