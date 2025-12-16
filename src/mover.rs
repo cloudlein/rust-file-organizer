@@ -47,11 +47,11 @@ struct FileMove {
     after: String,
 }
 
-pub fn move_files (
+pub fn move_files(
     root_path: &str,
     destination: &str,
     files: &HashMap<String, Vec<String>>,
-    dry_run: bool
+    dry_run: bool,
 ) -> Result<(), FileError> {
     preview_file_moves(files, root_path, destination, dry_run);
 
@@ -60,8 +60,14 @@ pub fn move_files (
     }
 
     for (category, items) in files {
-        let folder = format!("{}/{}", destination, category);
-        if let Err(e) = create_folder_and_move_files(&folder, items, root_path) {
+        let dest_dir = Path::new(destination).join(category);
+
+        if let Err(e) = create_folder_and_move_files(
+            category,
+            &dest_dir,
+            items,
+            root_path,
+        ) {
             eprintln!("{e}");
             return Err(e);
         }
@@ -70,19 +76,21 @@ pub fn move_files (
     Ok(())
 }
 
+
 fn preview_file_moves(
     files: &HashMap<String, Vec<String>>,
     path_scan: &str,
     destination: &str,
-    dry_run: bool
+    dry_run: bool,
 ) {
     let mut file_moves = Vec::new();
+
     for (category, items) in files {
         for item in items {
-            file_moves.push(FileMove{
-                before: format!("{}/{}", path_scan, item),
+            file_moves.push(FileMove {
+                before: format!("{}/{}/{}", path_scan, category, item),
                 after: format!("{}/{}/{}", destination, category, item),
-            })
+            });
         }
     }
 
@@ -99,51 +107,48 @@ fn preview_file_moves(
     println!("{}", table);
 }
 
+
 fn create_folder_and_move_files(
-    dir: &str,
+    category: &str,
+    dest_dir: &Path,
     file_paths: &[String],
-    src_path: &str,
+    src_root: &str,
 ) -> Result<(), FileError> {
 
-    std::fs::create_dir_all(dir).map_err(|err| {
+    std::fs::create_dir_all(dest_dir).map_err(|err| {
         if err.kind() == std::io::ErrorKind::PermissionDenied {
-            FileError::PermissionDenied { path: dir.into() }
+            FileError::PermissionDenied { path: dest_dir.into() }
         } else {
             FileError::FolderCreation {
-                path: dir.into(),
+                path: dest_dir.into(),
                 source: err,
             }
         }
     })?;
 
-    let destination = Path::new(dir);
+    let src_base = Path::new(src_root).join(category);
 
     for file in file_paths {
-        let src = Path::new(src_path).join(file);
+        let src = src_base.join(file);
 
         if !src.exists() {
-            eprintln!("{}", FileError::NotFound {
-                path: src.to_path_buf(),
-            });
+            eprintln!("{}", FileError::NotFound { path: src.clone() });
             continue;
         }
 
-        let file_name = src.file_name().unwrap();
-        let new_path = destination.join(file_name);
+        let dest = dest_dir.join(file);
 
-        if new_path.exists() {
-            eprintln!("{}", FileError::DestinationExists {
-                path: new_path.clone(),
-            });
+        if dest.exists() {
+            eprintln!("{}", FileError::DestinationExists { path: dest.clone() });
             continue;
         }
 
-        std::fs::rename(&src, &new_path).map_err(|e| match e.kind() {
+        std::fs::rename(&src, &dest).map_err(|e| match e.kind() {
             std::io::ErrorKind::PermissionDenied => FileError::PermissionDenied {
-                path: src.to_path_buf(),
+                path: src.clone(),
             },
             _ => FileError::FileMove {
-                path: src.to_path_buf(),
+                path: src.clone(),
                 source: e,
             },
         })?;
@@ -151,6 +156,7 @@ fn create_folder_and_move_files(
 
     Ok(())
 }
+
 
 
 /*
@@ -244,29 +250,33 @@ mod tests {
 
     #[test]
     fn test_move_file_mode() {
-        let scan_dir = create_temp_dir("test_scan");
-
-        let dest_dir = create_temp_dir("destination");
-
-        let destination_path = dest_dir.path().to_str().unwrap();
+        let scan_dir = create_temp_dir("scan");
+        let dest_dir = create_temp_dir("dest");
 
         let files = create_temp_file_per_category(
             [
-                ("images".to_string(), vec!["jpg".to_string(), "png".to_string()]),
-                ("videos".to_string(), vec!["mp4".to_string()]),
-                ("audio".to_string(), vec!["mp3".to_string(), "wav".to_string()]),
+                ("images".to_string(), vec!["file.jpg".to_string(), "file.png".to_string()]),
+                ("videos".to_string(), vec!["file.mp4".to_string()]),
+                ("audio".to_string(), vec!["file.mp3".to_string(), "file.wav".to_string()]),
             ]
                 .into_iter()
                 .collect(),
-            &scan_dir);
+            &scan_dir,
+        );
 
-        let result =  move_files(scan_dir.path().to_str().unwrap(), destination_path, &files, false);
+        let result = move_files(
+            scan_dir.path().to_str().unwrap(),
+            dest_dir.path().to_str().unwrap(),
+            &files,
+            false,
+        );
 
-        assert!(dest_dir.path().join("images").exists());
-        assert!(dest_dir.path().join("videos").exists());
+        assert!(result.is_ok());
+
         assert!(dest_dir.path().join("images/file.jpg").exists());
+        assert!(dest_dir.path().join("images/file.png").exists());
         assert!(dest_dir.path().join("videos/file.mp4").exists());
-
+        assert!(dest_dir.path().join("audio/file.mp3").exists());
     }
 
     #[test]
@@ -301,8 +311,8 @@ mod tests {
         assert!(captured_output.contains("file.jpg") && captured_output.contains("not found"));
         assert!(captured_output.contains("file.mp4") && captured_output.contains("not found"));
 
-        assert!(!dest_dir.path().join("images/file.jpg").exists());
-        assert!(!dest_dir.path().join("videos/file.mp4").exists());
+        assert!(!dest_dir.path().join("/images/file.jpg").exists());
+        assert!(!dest_dir.path().join("/videos/file.mp4").exists());
 
         assert!(result.is_ok());
     }
@@ -346,30 +356,26 @@ mod tests {
     }
 
     #[test]
-    fn  test_move_mode_permission_denied_on_move_file() {
+    fn test_move_mode_permission_denied_on_move_file() {
         use std::os::unix::fs::PermissionsExt;
+
         let scan_dir = create_temp_dir("test_scan");
         let dest_dir = create_temp_dir("destination");
         let destination_path = dest_dir.path().to_str().unwrap();
-
 
         let mut files = HashMap::new();
         files.insert("images".to_string(), vec!["file.jpg".to_string()]);
         files.insert("videos".to_string(), vec!["file.mp4".to_string()]);
 
-        for(folder, list_file) in &files {
-            let folder_path =  scan_dir.path().join(folder);
-            fs::create_dir_all(folder_path).unwrap()
-
+        for (_, list_file) in &files {
             for file in list_file {
-                let file_path =  scan_dir.path().join(file);
-                File::create(&file_path).unwrap();
-
-                let mut perm = file_path.metadata().unwrap().permissions();
-                perm.set_mode(0o444);
-                fs::set_permissions(&file_path, perm).unwrap();
+                File::create(scan_dir.path().join(file)).unwrap();
             }
         }
+
+        let mut perm = dest_dir.path().metadata().unwrap().permissions();
+        perm.set_mode(0o555);
+        fs::set_permissions(dest_dir.path(), perm).unwrap();
 
         let result = move_files(
             scan_dir.path().to_str().unwrap(),
@@ -378,20 +384,46 @@ mod tests {
             false,
         );
 
-
-        println!("masuk sini");
-        println!("{:?}", result);
-
-
+        assert!(matches!(
+        result,
+        Err(FileError::PermissionDenied { .. })
+    ));
     }
-    // test_move_mode_moves_files_based_on_dynamic_category_map()
+
+    #[test]
+     fn test_move_mode_moves_files_based_on_dynamic_category_map() {
+         let scan_dir = create_temp_dir("scan");
+         let dest_dir = create_temp_dir("dest");
+
+         let files = create_temp_file_per_category(
+             [
+                 ("weird_cat".to_string(), vec!["a.bin".to_string()]),
+                 ("☃️snow".to_string(), vec!["b.raw".to_string()]),
+                 ("2025".to_string(), vec!["c.dat".to_string()]),
+             ]
+                 .into_iter()
+                 .collect(),
+             &scan_dir
+         );
+
+         let result = move_files(
+             scan_dir.path().to_str().unwrap(),
+             dest_dir.path().to_str().unwrap(),
+             &files,
+             false,
+         );
+
+         assert!(result.is_ok());
+
+         assert!(dest_dir.path().join("weird_cat/a.bin").exists());
+         assert!(dest_dir.path().join("☃️snow/b.raw").exists());
+         assert!(dest_dir.path().join("2025/c.dat").exists());
+
+     }
+
+
     // test_integration_preview_then_move_output_order()
-    // test_move_mode_moves_files_based_on_dynamic_category_map()
     // test_preview_is_printed_before_move_operations()
-    // test_integration_preview_then_move_output_order()
-
-
-
 
     fn create_temp_dir(dir_name : &str) -> TempDir {
         Builder::new()
@@ -401,24 +433,17 @@ mod tests {
     }
 
     fn create_temp_file_per_category(
-        mapping: HashMap<String, Vec<String>>,
-        temp_file_path: &TempDir,
+        files: HashMap<String, Vec<String>>,
+        scan_dir: &TempDir,
     ) -> HashMap<String, Vec<String>> {
+        for (category, file_names) in &files {
+            let category_dir = scan_dir.path().join(category);
+            std::fs::create_dir_all(&category_dir).unwrap();
 
-        let mut files = HashMap::new();
-
-        for (category, exts) in mapping {
-            for ext in &exts {
-                let file_path = temp_file_path.path().join(format!("file.{}", ext));
-                File::create(file_path).unwrap();
+            for file_name in file_names {
+                let file_path = category_dir.join(file_name);
+                File::create(&file_path).unwrap();
             }
-
-            let list = exts
-                .iter()
-                .map(|ext| format!("file.{}", ext))
-                .collect::<Vec<_>>();
-
-            files.insert(category, list);
         }
 
         files
