@@ -423,7 +423,40 @@ mod tests {
 
 
     // test_integration_preview_then_move_output_order()
-    // test_preview_is_printed_before_move_operations()
+
+    #[test]
+    fn test_preview_is_printed_before_move_operations() {
+        let scan_dir = create_temp_dir("scan");
+        let dest_dir = create_temp_dir("dest");
+
+        let files = create_temp_file_per_category(
+            [
+                ("cat1".to_string(), vec!["a.txt".to_string()]),
+                ("cat2".to_string(), vec!["b.txt".to_string()]),
+            ]
+                .into_iter()
+                .collect(),
+            &scan_dir,
+        );
+
+        let result = move_files(
+            scan_dir.path().to_str().unwrap(),
+            dest_dir.path().to_str().unwrap(),
+            &files,
+            true,
+        );
+
+        assert!(result.is_ok());
+
+        // File masih ada di scan
+        assert!(scan_dir.path().join("cat1/a.txt").exists());
+        assert!(scan_dir.path().join("cat2/b.txt").exists());
+
+        // File belum ada di dest
+        assert!(!dest_dir.path().join("cat1/a.txt").exists());
+        assert!(!dest_dir.path().join("cat2/b.txt").exists());
+
+    }
 
     fn create_temp_dir(dir_name : &str) -> TempDir {
         Builder::new()
